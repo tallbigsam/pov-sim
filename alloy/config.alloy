@@ -1,0 +1,71 @@
+logging {
+  level  = "debug"
+  format = "logfmt"
+}
+
+//look for the file reader block module.
+
+// config auth as stated: https://grafana.com/docs/alloy/latest/collect/opentelemetry-to-lgtm-stack/#grafana-cloud 
+otelcol.auth.basic "default" {
+  //warning I nabbed the username from the api key rather than one of the setup's. 
+  username = sys.env("OTELCOL_AUTH_BASIC_UNAME")
+  password = sys.env("OTELCOL_AUTH_BASIC_PASSWORD")
+}
+
+otelcol.exporter.loki "default" {
+  forward_to = [loki.write.grafanacloud.receiver]
+}
+
+loki.write "grafanacloud" {
+  endpoint {
+    url = "https://logs-prod-035.grafana.net/loki/api/v1/push"
+
+    // don't know if this username is supposed to be different! 
+    // for some reason you can't reference passwords like otelcol.auth.basic.default.password
+    basic_auth {
+      username = sys.env("LOKI_WRITE_UNAME")
+      password = sys.env("OTELCOL_AUTH_BASIC_PASSWORD")
+    }
+  }
+}
+
+otelcol.exporter.otlphttp "grafanacloud" {
+  client {
+    endpoint = "https://otlp-gateway-prod-gb-south-1.grafana.net/otlp"
+    auth = otelcol.auth.basic.default.handler
+  }
+}
+
+// Debug exporter to see what logs are being received
+otelcol.exporter.debug "default" {
+  verbosity = "detailed"
+}
+
+// docs then say that once you have an exporter you can define a receiver 
+otelcol.receiver.otlp "default" {
+
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    logs    = [otelcol.exporter.loki.default.input]
+    traces  = [otelcol.exporter.otlp.grafana_cloud_traces.input]
+    metrics = [otelcol.exporter.otlphttp.grafanacloud.input, otelcol.exporter.debug.default.input]
+  }
+}
+
+otelcol.exporter.otlp "grafana_cloud_traces" {
+  client {
+    endpoint = "tempo-prod-25-prod-gb-south-1.grafana.net:443"
+    auth = otelcol.auth.basic.grafana_cloud_traces.handler
+  }
+}
+otelcol.auth.basic "grafana_cloud_traces" {
+  username = sys.env("CLOUD_TRACES_UNAME")
+  password = sys.env("OTELCOL_AUTH_BASIC_PASSWORD")
+}
