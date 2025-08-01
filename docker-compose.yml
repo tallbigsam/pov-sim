@@ -1,10 +1,11 @@
-version: '1'
 services:
   airlines:
     build: 
       context: ./airlines
     ports:
       - "8080:8080"
+    env_file:
+      - ./airlines/.env
   flights:
     build: 
       context: ./flights
@@ -18,3 +19,13 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+  alloy:
+    build:
+      context: ./alloy
+    ports:
+      - "12345:12345"
+    environment:
+      - OTELCOL_AUTH_BASIC_UNAME=${OTELCOL_AUTH_BASIC_UNAME}
+      - OTELCOL_AUTH_BASIC_PASSWORD=${OTELCOL_AUTH_BASIC_PASSWORD}
+      - LOKI_WRITE_UNAME=${LOKI_WRITE_UNAME}
+      - CLOUD_TRACES_UNAME=${CLOUD_TRACES_UNAME}
